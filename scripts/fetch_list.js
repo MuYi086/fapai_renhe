@@ -2,6 +2,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+const RESULT_DIR = path.join(__dirname, '..', 'result');
 const LIST_URL = 'https://www1.rmfysszc.gov.cn/News/Handler.aspx';
 const HEADERS = {
   'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -112,8 +113,8 @@ async function main() {
     }
   }
 
-  fs.writeFileSync('list_results.json', JSON.stringify(results, null, 2));
-  console.log(`Saved ${results.length} list items to list_results.json`);
+  fs.writeFileSync(path.join(RESULT_DIR, 'list_results.json'), JSON.stringify(results, null, 2));
+  console.log(`Saved ${results.length} list items to result/list_results.json`);
 }
 
 main();

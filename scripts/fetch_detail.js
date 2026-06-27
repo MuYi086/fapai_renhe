@@ -2,6 +2,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+const RESULT_DIR = path.join(__dirname, '..', 'result');
 const SLEEP_MS = 800;
 const TIMEOUT_MS = 30000;
 const MAX_RETRIES = 3;
@@ -12,7 +13,7 @@ function sleep(ms) {
 
 function loadExistingResults() {
   try {
-    const data = JSON.parse(fs.readFileSync('仁和.json', 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, '仁和.json'), 'utf-8'));
     console.log(`Loaded ${data.length} existing results.`);
     return data;
   } catch (e) {
@@ -130,7 +131,7 @@ function parseDetail(html) {
 }
 
 async function main() {
-  const listData = JSON.parse(fs.readFileSync('list_results.json', 'utf-8'));
+  const listData = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, 'list_results.json'), 'utf-8'));
   let results = loadExistingResults();
   const failed = [];
   
@@ -177,7 +178,7 @@ async function main() {
 
     // Save progress every 10 items
     if ((i + 1) % 10 === 0 || i === remaining.length - 1) {
-      fs.writeFileSync('仁和.json', JSON.stringify(results, null, 2));
+      fs.writeFileSync(path.join(RESULT_DIR, '仁和.json'), JSON.stringify(results, null, 2));
       console.log(`  -> Progress saved (${results.length} total)`);
     }
 
@@ -187,9 +188,9 @@ async function main() {
   }
 
   // Save final results
-  fs.writeFileSync('仁和.json', JSON.stringify(results, null, 2));
+  fs.writeFileSync(path.join(RESULT_DIR, '仁和.json'), JSON.stringify(results, null, 2));
   if (failed.length > 0) {
-    fs.writeFileSync('failed_items.json', JSON.stringify(failed, null, 2));
+    fs.writeFileSync(path.join(RESULT_DIR, 'failed_items.json'), JSON.stringify(failed, null, 2));
   }
 
   console.log(`\nDone! Total: ${results.length}, Failed: ${failed.length}`);

@@ -1,6 +1,8 @@
 const fs = require('fs');
+const path = require('path');
 
-const data = JSON.parse(fs.readFileSync('仁和.json', 'utf-8'));
+const RESULT_DIR = path.join(__dirname, '..', 'result');
+const data = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, '仁和.json'), 'utf-8'));
 
 // 定义房产相关关键词（用于匹配）
 const propertyKeywords = [
@@ -65,6 +67,6 @@ excluded.slice(0, 5).forEach(x => {
   console.log(`  - ${x.title || x.property_address || '(无标题)'}`);
 });
 
-fs.writeFileSync('仁和房产.json', JSON.stringify(propertyData, null, 2));
+fs.writeFileSync(path.join(RESULT_DIR, '仁和房产.json'), JSON.stringify(propertyData, null, 2));
 console.log('');
-console.log('已保存: 仁和房产.json');
+console.log('已保存: result/仁和房产.json');
