@@ -1,9 +1,21 @@
+/**
+ * @fileoverview 人民法院诉讼资产网拍卖公告列表爬虫
+ * @description 抓取仁和街道相关房产拍卖公告的分页列表数据
+ * - POST 请求 Handler.aspx 接口获取分页 HTML
+ * - 正则解析列表行提取链接、标题、法院、日期
+ * - 输出 list_results.json 供详情爬虫使用
+ * @module scripts/fetch_list
+ */
+
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+/** 数据输出目录 */
 const RESULT_DIR = path.join(__dirname, '..', 'result');
+/** 搜索列表接口地址 */
 const LIST_URL = 'https://www1.rmfysszc.gov.cn/News/Handler.aspx';
+/** 请求头，伪造浏览器特征绕过创宇盾 WAF */
 const HEADERS = {
   'Accept': 'application/json, text/javascript, */*; q=0.01',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -21,6 +33,12 @@ const HEADERS = {
   'sec-ch-ua-platform': '""'
 };
 
+/**
+ * 请求指定页码的拍卖公告列表
+ * @param {number} page - 页码，从 1 开始
+ * @returns {Promise<string>} 原始 HTML 响应内容
+ * @throws {Error} HTTP 状态码非 200 时抛出错误
+ */
 function fetchListPage(page) {
   return new Promise((resolve, reject) => {
     const postData = `search=${encodeURIComponent('仁和')}&fid1=100&fid2=5320&fid3=&page=${page}&include=0`;
@@ -52,6 +70,10 @@ function fetchListPage(page) {
   });
 }
 
+/**
+ * 主流程：遍历分页抓取所有列表数据
+ * @returns {Promise<void>}
+ */
 async function main() {
   const results = [];
   let page = 1;

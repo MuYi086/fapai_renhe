@@ -1,16 +1,38 @@
+/**
+ * @fileoverview 人民法院诉讼资产网拍卖公告详情爬虫
+ * @description 逐条抓取拍卖公告详情页，解析关键信息
+ * - 支持断点续爬：加载已有结果跳过已处理 URL
+ * - 解析法院名称、发布日期、房产地址、评估价、起拍价、拍卖次数、标的链接
+ * - 每 10 条自动保存进度，失败项记录到 failed_items.json
+ * @module scripts/fetch_detail
+ */
+
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+/** 数据输出目录 */
 const RESULT_DIR = path.join(__dirname, '..', 'result');
+/** 请求间隔（毫秒），避免触发限流 */
 const SLEEP_MS = 800;
+/** 请求超时时间（毫秒） */
 const TIMEOUT_MS = 30000;
+/** 最大重试次数 */
 const MAX_RETRIES = 3;
 
+/**
+ * 异步延时
+ * @param {number} ms - 延时毫秒数
+ * @returns {Promise<void>}
+ */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * 加载已抓取的结果（断点续爬）
+ * @returns {Array<Object>} 已有的详情数据数组，文件不存在时返回空数组
+ */
 function loadExistingResults() {
   try {
     const data = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, '仁和.json'), 'utf-8'));
@@ -21,6 +43,14 @@ function loadExistingResults() {
   }
 }
 
+/**
+ * 发起 HTTP GET 请求，支持自动重试和跟随重定向
+ * @param {string} url - 请求地址
+ * @param {Object} [headers={}] - 请求头
+ * @param {number} [retries=0] - 当前重试次数
+ * @returns {Promise<string>} 响应体内容
+ * @throws {Error} 超过最大重试次数后抛出错误
+ */
 function fetchUrl(url, headers = {}, retries = 0) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https:') ? https : require('http');
@@ -58,6 +88,18 @@ function fetchUrl(url, headers = {}, retries = 0) {
   });
 }
 
+/**
+ * 解析详情页 HTML，提取拍卖公告关键字段
+ * @param {string} html - 详情页原始 HTML
+ * @returns {Object} 解析后的详情数据
+ * @returns {string} result.court_name - 法院名称
+ * @returns {string} result.publish_date - 发布日期
+ * @returns {string} result.property_address - 房产地址
+ * @returns {string} result.assessment_price - 评估价（万元）
+ * @returns {string} result.starting_price - 起拍价（万元）
+ * @returns {string} result.auction_round - 拍卖次数（如"第一次拍卖"）
+ * @returns {string} result.item_link - 淘宝司法拍卖链接
+ */
 function parseDetail(html) {
   const result = {
     court_name: '',
@@ -75,13 +117,13 @@ function parseDetail(html) {
     const title = h1Match[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
     // Title format: 法院名称关于...房产（第X次拍卖）的公告
     result.court_name = title.split('关于')[0]?.trim() || '';
-    
+
     // Extract auction round from parentheses
     const roundMatch = title.match(/（第(.+?)次拍卖）/);
     if (roundMatch) {
       result.auction_round = '第' + roundMatch[1] + '次拍卖';
     }
-    
+
     // Extract property address: try multiple title formats
     const addrMatch = title.match(/关于(.+?)（第.+?次拍卖）/);
     if (addrMatch) {
@@ -130,14 +172,18 @@ function parseDetail(html) {
   return result;
 }
 
+/**
+ * 主流程：遍历列表逐条抓取详情并保存
+ * @returns {Promise<void>}
+ */
 async function main() {
   const listData = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, 'list_results.json'), 'utf-8'));
   let results = loadExistingResults();
   const failed = [];
-  
+
   // Build a set of already processed URLs
   const processedUrls = new Set(results.map(r => r.detail_url));
-  
+
   // Filter out already processed items
   const remaining = listData.filter(item => !processedUrls.has(item.href));
   console.log(`Total list: ${listData.length}, Already processed: ${processedUrls.size}, Remaining: ${remaining.length}`);
@@ -155,7 +201,7 @@ async function main() {
     try {
       const html = await fetchUrl(item.href, headers);
       const detail = parseDetail(html);
-      
+
       // Merge with list data
       detail.publish_date = item.date;
       // Fix invalid court_name (e.g. "变卖公告", "拍卖公告")

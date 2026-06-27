@@ -1,10 +1,22 @@
+/**
+ * @fileoverview 房产拍卖数据筛选器
+ * @description 从抓取结果中筛选纯房产条目，排除工业厂房、机器设备、土地等非房产类型
+ * - 白名单关键词匹配房产类型
+ * - 黑名单关键词排除非房产类型
+ * - 输出筛选统计和仁和房产.json
+ * @module scripts/filter_property
+ */
+
 const fs = require('fs');
 const path = require('path');
 
+/** 数据输出目录 */
 const RESULT_DIR = path.join(__dirname, '..', 'result');
+
+/** 原始抓取数据 */
 const data = JSON.parse(fs.readFileSync(path.join(RESULT_DIR, '仁和.json'), 'utf-8'));
 
-// 定义房产相关关键词（用于匹配）
+/** 房产相关关键词白名单 */
 const propertyKeywords = [
   '房产', '不动产', '住宅', '公寓', '别墅', '室', '幢', '单元', '楼', '宅',
   '花园', '小区', '家园', '庭', '苑', '园', '居', '城', '郡', '轩', '台',
@@ -13,29 +25,37 @@ const propertyKeywords = [
   '商品房', '经济适用房', '宅基地', '自建房', '房',
 ];
 
-// 定义非房产关键词（用于排除）
+/** 非房产关键词黑名单 */
 const nonPropertyKeywords = [
   '工业厂房', '机器设备', '国有工业', '土地使用权', '非住宅', '工业用', '工业房地产',
   '非住宅工业', '国有工业出让用地', '工业出让', '地上附属物', '宗地', '工业厂房内',
   '国有土地使用权', '宗地及地上', '机器设备一批', '工业厂房', '厂房', '设备', '机械',
 ];
 
+/**
+ * 判断一条记录是否为房产
+ * @param {Object} item - 拍卖记录
+ * @param {string} [item.property_address] - 房产地址
+ * @param {string} [item.title] - 公告标题
+ * @returns {boolean} 是否为房产条目
+ */
 function isProperty(item) {
   const text = (item.property_address || '') + (item.title || '');
-  
+
   // 先排除明显的非房产
   for (const kw of nonPropertyKeywords) {
     if (text.includes(kw)) return false;
   }
-  
+
   // 再判断是否是房产
   for (const kw of propertyKeywords) {
     if (text.includes(kw)) return true;
   }
-  
+
   return false;
 }
 
+/** 筛选后的房产数据 */
 const propertyData = data.filter(isProperty);
 
 // 统计被排除的类型
