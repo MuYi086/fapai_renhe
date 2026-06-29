@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "dev:mp-weixin": "vite build --mode mp-weixin",
-    "build:mp-weixin": "vite build --mode mp-weixin"
+    "dev:h5": "npx uni --host 0.0.0.0 -p h5",
+    "dev:mp-weixin": "npx uni build -p mp-weixin",
+    "build:mp-weixin": "npx uni build -p mp-weixin",
+    "dev:mp-alipay": "npx uni build -p mp-alipay",
+    "build:mp-alipay": "npx uni build -p mp-alipay"
   },
   "dependencies": {
     "@dcloudio/uni-app": "^3.0.0-alpha-5010420260626001",
     "@dcloudio/uni-h5": "^3.0.0-alpha-5010420260626001",
+    "@dcloudio/uni-mp-alipay": "^3.0.0-alpha-5010420260626001",
     "@dcloudio/uni-mp-weixin": "^3.0.0-alpha-5010420260626001",
-    "uv-ui": "^1.0.25",
     "vue": "^3.4.0"
   },
   "devDependencies": {

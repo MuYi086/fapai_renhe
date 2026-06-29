@@ -4,13 +4,21 @@
       "path": "pages/index/index",
       "style": {
         "navigationBarTitleText": "仁和社区法拍房",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/detail/detail",
+      "style": {
+        "navigationBarTitleText": "房源详情",
         "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/webview/webview",
       "style": {
-        "navigationBarTitleText": "链接页面"
+        "navigationBarTitleText": "拍卖链接"
       }
     }
   ],
