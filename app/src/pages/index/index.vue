@@ -1,17 +1,17 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { onLoad, onPullDownRefresh, onShareAppMessage } from '@dcloudio/uni-app'
+import communityJson from '@/static/community.json'
+import houseJson from '@/static/house.json'
 
 // 安全区域高度
 const statusBarHeight = ref(0)
 const navBarHeight = ref(44)
-const totalNavHeight = computed(() => statusBarHeight.value + navBarHeight.value)
 
 function getSystemInfo() {
   try {
     const info = uni.getSystemInfoSync()
     statusBarHeight.value = info.statusBarHeight || 0
-    // 胶囊按钮高度 + 间距 作为导航栏高度参考
     const menu = uni.getMenuButtonBoundingClientRect ? uni.getMenuButtonBoundingClientRect() : null
     if (menu) {
       navBarHeight.value = (menu.top - (info.statusBarHeight || 0)) * 2 + menu.height
@@ -33,7 +33,7 @@ const searchKeyword = ref('')
 const showFilter = ref(false)
 
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(15) // 与 web 保持一致
 
 // 加载数据
 function loadData(refresh = false) {
@@ -41,28 +41,15 @@ function loadData(refresh = false) {
     page.value = 1
   }
   loading.value = true
-  uni.request({
-    url: '/static/community.json',
-    success: (res) => {
-      communityData.value = res.data || {}
-      communityNames.value = Object.keys(res.data || {})
-    }
-  })
-  uni.request({
-    url: '/static/house.json',
-    success: (res) => {
-      houseList.value = res.data || []
-      loading.value = false
-      if (refresh) {
-        uni.stopPullDownRefresh()
-        uni.showToast({ title: '刷新成功', icon: 'success', duration: 1000 })
-      }
-    },
-    fail: () => {
-      loading.value = false
-      if (refresh) {
-        uni.stopPullDownRefresh()
-      }
+
+  Promise.resolve().then(() => {
+    communityData.value = communityJson || {}
+    communityNames.value = Object.keys(communityJson || {})
+    houseList.value = (houseJson || []).map((item, idx) => ({ ...item, _rawIdx: idx }))
+    loading.value = false
+    if (refresh) {
+      uni.stopPullDownRefresh()
+      uni.showToast({ title: '刷新成功', icon: 'success', duration: 1000 })
     }
   })
 }
@@ -82,7 +69,7 @@ const currentEstateOptions = computed(() => {
   return communityData.value[selectedCommunity.value] || []
 })
 
-// 筛选
+// 筛选后的数据（与 web 逻辑一致）
 const filteredList = computed(() => {
   let list = [...houseList.value]
   if (selectedCommunity.value) {
@@ -100,6 +87,7 @@ const filteredList = computed(() => {
       return addr.includes(kw) || room.includes(kw) || estate.includes(kw)
     })
   }
+  // 按发布日期降序排序，与 web 的 default-sort 保持一致
   return list.sort((a, b) => {
     const da = (a.publish_date || '').replace(/\./g, '')
     const db = (b.publish_date || '').replace(/\./g, '')
@@ -118,6 +106,10 @@ const loadStatus = computed(() => {
   return 'loadmore'
 })
 
+const hasFilter = computed(() => {
+  return selectedCommunity.value || selectedEstate.value || searchKeyword.value.trim()
+})
+
 function loadMore() {
   if (loadStatus.value === 'loadmore') {
     page.value++
@@ -126,9 +118,16 @@ function loadMore() {
 
 function onSearchInput(e) {
   searchKeyword.value = e.detail.value
+  page.value = 1
 }
 
 function doSearch() {
+  page.value = 1
+  uni.hideKeyboard()
+}
+
+function clearSearch() {
+  searchKeyword.value = ''
   page.value = 1
 }
 
@@ -140,6 +139,13 @@ function confirmFilter() {
 function resetFilter() {
   selectedCommunity.value = ''
   selectedEstate.value = ''
+  page.value = 1
+}
+
+function resetAll() {
+  selectedCommunity.value = ''
+  selectedEstate.value = ''
+  searchKeyword.value = ''
   page.value = 1
 }
 
@@ -160,6 +166,13 @@ function selectEstate(name) {
   }
 }
 
+function goDetail(rawIdx) {
+  if (rawIdx === undefined || rawIdx === null) return
+  uni.navigateTo({
+    url: '/pages/detail/detail?idx=' + rawIdx
+  })
+}
+
 function formatPrice(price) {
   if (!price) return '-'
   const num = parseFloat(price.toString().replace(/,/g, ''))
@@ -170,35 +183,14 @@ function formatPrice(price) {
   return num.toLocaleString()
 }
 
-function openLink(url) {
-  if (!url) return
-  uni.showModal({
-    title: '提示',
-    content: '即将打开淘宝拍卖链接',
-    confirmText: '打开',
-    success: (res) => {
-      if (res.confirm) {
-        uni.navigateTo({
-          url: '/pages/webview/webview?url=' + encodeURIComponent(url)
-        })
-      }
-    }
-  })
-}
-
-function goDetail(index) {
-  uni.navigateTo({
-    url: '/pages/detail/detail?idx=' + index
-  })
-}
-
-watch([selectedCommunity, selectedEstate, searchKeyword], () => {
+// 监听筛选条件变化，自动重置分页
+watch([selectedCommunity, selectedEstate], () => {
   page.value = 1
 }, { flush: 'post' })
 
 onShareAppMessage(() => {
   return {
-    title: '仁和社区法拍房信息查询',
+    title: '仁和街道法拍房信息查询',
     path: '/pages/index/index'
   }
 })
@@ -209,7 +201,7 @@ onShareAppMessage(() => {
     <!-- 自定义导航栏 -->
     <view class="custom-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="nav-bar" :style="{ height: navBarHeight + 'px' }">
-        <text class="nav-title">仁和社区法拍房</text>
+        <text class="nav-title">仁和街道法拍房</text>
       </view>
     </view>
 
@@ -221,34 +213,51 @@ onShareAppMessage(() => {
           <input
             class="search-input"
             :value="searchKeyword"
-            placeholder="搜索地址、小区、房间号"
+            placeholder="搜索地址、小区、房间号..."
             confirm-type="search"
             @input="onSearchInput"
             @confirm="doSearch"
           />
-          <text v-if="searchKeyword" class="clear-icon" @click="searchKeyword = ''">&#10005;</text>
+          <text v-if="searchKeyword" class="clear-icon" @click="clearSearch">&#10005;</text>
         </view>
       </view>
       <view class="filter-btn" @click="showFilter = true">
         <text>筛选</text>
+        <view v-if="hasFilter" class="filter-dot"></view>
       </view>
     </view>
 
     <!-- 已选筛选标签 -->
-    <view class="filter-tags" v-if="selectedCommunity || selectedEstate">
-      <view class="tag tag-primary" v-if="selectedCommunity" @click="selectedCommunity = ''">
-        <text>{{ selectedCommunity }}</text>
-        <text class="tag-close">&#10005;</text>
-      </view>
-      <view class="tag tag-success" v-if="selectedEstate" @click="selectedEstate = ''">
-        <text>{{ selectedEstate }}</text>
-        <text class="tag-close">&#10005;</text>
-      </view>
+    <view class="filter-tags" v-if="hasFilter">
+      <scroll-view scroll-x class="filter-tags-scroll" show-scrollbar="false">
+        <view class="filter-tags-inner">
+          <view class="tag tag-primary" v-if="selectedCommunity" @click="selectedCommunity = ''">
+            <text>社区：{{ selectedCommunity }}</text>
+            <text class="tag-close">&#10005;</text>
+          </view>
+          <view class="tag tag-success" v-if="selectedEstate" @click="selectedEstate = ''">
+            <text>小区：{{ selectedEstate }}</text>
+            <text class="tag-close">&#10005;</text>
+          </view>
+          <view class="tag tag-warning" v-if="searchKeyword.trim()" @click="clearSearch">
+            <text>搜索：{{ searchKeyword }}</text>
+            <text class="tag-close">&#10005;</text>
+          </view>
+          <view class="reset-btn" @click="resetAll">
+            <text>&#8634; 重置</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
 
-    <!-- 统计 -->
+    <!-- 统计栏 -->
     <view class="stats-bar">
-      <text>共 {{ filteredList.length }} 条记录</text>
+      <view class="stats-left">
+        <text>共 <text class="stats-num">{{ filteredList.length }}</text> 条记录</text>
+      </view>
+      <view class="stats-right">
+        <text class="sort-hint">按发布日期降序</text>
+      </view>
     </view>
 
     <!-- 列表 -->
@@ -256,26 +265,39 @@ onShareAppMessage(() => {
       <view v-if="filteredList.length === 0 && !loading" class="empty-wrap">
         <view class="empty-icon">&#128196;</view>
         <text class="empty-text">暂无数据</text>
+        <view class="empty-btn" @click="resetAll">
+          <text>重置筛选条件</text>
+        </view>
       </view>
 
       <view v-else class="card-list">
         <view
           v-for="(item, index) in displayList"
-          :key="index"
+          :key="item._rawIdx"
           class="house-card"
-          @click="goDetail(houseList.indexOf(item))"
+          @click="goDetail(item._rawIdx)"
         >
+          <!-- 卡片头部：序号 + 社区 + 小区 + 房间号 -->
           <view class="card-header">
             <view class="header-left">
+              <text class="index-num">{{ index + 1 }}</text>
               <text class="community-tag">{{ item['社区'] }}</text>
               <text class="estate-name">{{ item['小区名'] }}</text>
             </view>
             <text class="room-no">{{ item['房间号'] }}</text>
           </view>
+
+          <!-- 房产地址 -->
           <view class="card-address">{{ item.property_address }}</view>
-          <view class="card-info">
+
+          <!-- 信息网格 -->
+          <view class="card-info-grid">
             <view class="info-item">
-              <text class="info-label">面积</text>
+              <text class="info-label">拍卖轮次</text>
+              <text class="info-value">{{ item.auction_round || '-' }}</text>
+            </view>
+            <view class="info-item">
+              <text class="info-label">建筑面积</text>
               <text class="info-value">{{ item['建筑面积'] || '-' }} m²</text>
             </view>
             <view class="info-item">
@@ -283,35 +305,50 @@ onShareAppMessage(() => {
               <text class="info-value">{{ item['当前楼层'] || '-' }}/{{ item['总楼层'] || '-' }}</text>
             </view>
             <view class="info-item">
-              <text class="info-label">年份</text>
+              <text class="info-label">建筑年份</text>
               <text class="info-value">{{ item['建筑年份'] || '-' }}</text>
             </view>
             <view class="info-item">
               <text class="info-label">用途</text>
               <text class="info-value">{{ item['用途'] || '-' }}</text>
             </view>
+            <view class="info-item">
+              <text class="info-label">发布日期</text>
+              <text class="info-value">{{ item.publish_date || '-' }}</text>
+            </view>
           </view>
+
+          <!-- 价格区 -->
           <view class="card-price">
             <view class="price-item">
               <text class="price-label">起拍价</text>
               <text class="price-value start">{{ formatPrice(item['起拍价']) }}</text>
             </view>
+            <view class="price-divider"></view>
             <view class="price-item">
               <text class="price-label">评估价</text>
               <text class="price-value eval">{{ formatPrice(item['评估价']) }}</text>
             </view>
+            <view class="price-divider"></view>
+            <view class="price-item">
+              <text class="price-label">状态</text>
+              <text class="price-value status">{{ item['是否已腾空'] || '-' }}</text>
+            </view>
           </view>
+
+          <!-- 标签区 -->
           <view class="card-tags">
-            <view class="tag tag-warning">{{ item.auction_round }}</view>
+            <view v-if="item.auction_round" class="tag tag-warning">{{ item.auction_round }}</view>
             <view v-if="item['是否已腾空'] === '是'" class="tag tag-success">已腾空</view>
             <view v-else-if="item['是否已腾空'] === '否'" class="tag tag-danger">未腾空</view>
             <view v-if="item['租赁情况']" class="tag tag-info">{{ item['租赁情况'] }}</view>
           </view>
+
+          <!-- 底部操作 -->
           <view class="card-footer">
             <text class="publish-date">发布: {{ item.publish_date }}</text>
             <view class="footer-actions">
-              <view class="btn btn-mini btn-plain" @click.stop="goDetail(houseList.indexOf(item))">查看详情</view>
-              <view class="btn btn-mini btn-primary" @click.stop="openLink(item.item_link)">淘宝链接</view>
+              <view class="btn btn-mini btn-primary" @click.stop="goDetail(item._rawIdx)">查看详情</view>
             </view>
           </view>
         </view>
@@ -464,24 +501,70 @@ onShareAppMessage(() => {
   padding: 8px 14px;
   border-radius: 20px;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.filter-dot {
+  width: 8px;
+  height: 8px;
+  background: #f56c6c;
+  border-radius: 50%;
+  position: absolute;
+  top: 4px;
+  right: 4px;
 }
 
 /* 筛选标签 */
 .filter-tags {
-  display: flex;
-  gap: 8px;
   padding: 8px 16px;
   background: #fff;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.filter-tags-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.filter-tags-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reset-btn {
+  background: #f0f0f0;
+  color: #666;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 
 /* 统计 */
 .stats-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 8px 16px;
   font-size: 13px;
   color: #666;
   background: #f5f7fa;
   flex-shrink: 0;
+}
+
+.stats-num {
+  color: #1a2980;
+  font-weight: 600;
+}
+
+.sort-hint {
+  font-size: 12px;
+  color: #999;
 }
 
 /* 列表 */
@@ -515,6 +598,15 @@ onShareAppMessage(() => {
   color: #999;
 }
 
+.empty-btn {
+  margin-top: 8px;
+  background: #1a2980;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
 /* 卡片 */
 .house-card {
   background: #fff;
@@ -534,6 +626,19 @@ onShareAppMessage(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.index-num {
+  width: 22px;
+  height: 22px;
+  background: #1a2980;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .community-tag {
@@ -565,19 +670,23 @@ onShareAppMessage(() => {
   line-height: 1.5;
 }
 
-.card-info {
+/* 信息网格 */
+.card-info-grid {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 0;
   margin-bottom: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #f0f0f0;
 }
 
 .info-item {
+  width: 33.33%;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  padding-right: 4px;
+  box-sizing: border-box;
 }
 
 .info-label {
@@ -591,26 +700,33 @@ onShareAppMessage(() => {
   font-weight: 500;
 }
 
+/* 价格 */
 .card-price {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  justify-content: space-around;
   margin-bottom: 10px;
+  padding: 10px 0;
+  background: #fafbfc;
+  border-radius: 8px;
 }
 
 .price-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
 .price-label {
-  font-size: 11px;
+  font-size: 12px;
   color: #999;
 }
 
 .price-value {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .price-value.start {
@@ -618,9 +734,21 @@ onShareAppMessage(() => {
 }
 
 .price-value.eval {
-  color: #999;
-  font-size: 14px;
-  font-weight: 400;
+  color: #666;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.price-value.status {
+  color: #1a2980;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.price-divider {
+  width: 1px;
+  height: 36px;
+  background: #e0e0e0;
 }
 
 .card-tags {

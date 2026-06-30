@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import houseJson from '@/static/house.json'
 
 const house = ref(null)
 const houseIndex = ref('')
@@ -37,44 +38,21 @@ onLoad((options) => {
 
 function loadDetail(idx) {
   loading.value = true
-  uni.request({
-    url: '/static/house.json',
-    success: (res) => {
-      const list = res.data || []
-      const index = parseInt(idx)
-      if (index >= 0 && index < list.length) {
-        house.value = list[index]
-      } else {
-        uni.showToast({ title: '未找到房源', icon: 'error' })
-        setTimeout(() => uni.navigateBack(), 1500)
-      }
-      loading.value = false
-    },
-    fail: () => {
-      loading.value = false
-      uni.showToast({ title: '加载失败', icon: 'error' })
+  Promise.resolve().then(() => {
+    const list = houseJson || []
+    const index = parseInt(idx)
+    if (index >= 0 && index < list.length) {
+      house.value = list[index]
+    } else {
+      uni.showToast({ title: '未找到房源', icon: 'error' })
+      setTimeout(() => uni.navigateBack(), 1500)
     }
+    loading.value = false
   })
 }
 
 function goBack() {
   uni.navigateBack()
-}
-
-function openLink(url) {
-  if (!url) return
-  uni.showModal({
-    title: '提示',
-    content: '即将打开外部链接',
-    confirmText: '打开',
-    success: (res) => {
-      if (res.confirm) {
-        uni.navigateTo({
-          url: '/pages/webview/webview?url=' + encodeURIComponent(url)
-        })
-      }
-    }
-  })
 }
 
 function formatPrice(price) {
@@ -95,8 +73,12 @@ function calcDiscount(start, evalPrice) {
   return (s / e * 100).toFixed(1) + '%'
 }
 
+function isEmpty(val) {
+  return val === undefined || val === null || val === ''
+}
+
 onShareAppMessage(() => {
-  if (!house.value) return { title: '仁和社区法拍房' }
+  if (!house.value) return { title: '仁和街道法拍房' }
   return {
     title: `${house.value['小区名'] || ''} ${house.value['房间号'] || ''} - 法拍房`,
     path: `/pages/detail/detail?idx=${houseIndex.value}`
@@ -127,9 +109,10 @@ onShareAppMessage(() => {
         </view>
         <view class="address">{{ house.property_address || '-' }}</view>
         <view class="header-tags">
-          <view class="tag tag-warning">{{ house.auction_round || '-' }}</view>
+          <view v-if="house.auction_round" class="tag tag-warning">{{ house.auction_round }}</view>
           <view v-if="house['是否已腾空'] === '是'" class="tag tag-success">已腾空</view>
           <view v-else-if="house['是否已腾空'] === '否'" class="tag tag-danger">未腾空</view>
+          <view v-if="house['租赁情况']" class="tag tag-info">{{ house['租赁情况'] }}</view>
         </view>
       </view>
 
@@ -167,6 +150,18 @@ onShareAppMessage(() => {
             <text class="cell-value">{{ house['建筑面积'] || '-' }} m²</text>
           </view>
           <view class="info-cell">
+            <text class="cell-label">套内面积</text>
+            <text class="cell-value">{{ house['套内面积'] || '-' }} m²</text>
+          </view>
+          <view class="info-cell">
+            <text class="cell-label">土地面积</text>
+            <text class="cell-value">{{ house['土地使用权面积'] || '-' }} m²</text>
+          </view>
+          <view class="info-cell">
+            <text class="cell-label">分摊面积</text>
+            <text class="cell-value">{{ house['分摊面积'] || '-' }} m²</text>
+          </view>
+          <view class="info-cell">
             <text class="cell-label">用途</text>
             <text class="cell-value">{{ house['用途'] || '-' }}</text>
           </view>
@@ -183,12 +178,24 @@ onShareAppMessage(() => {
             <text class="cell-value">{{ house['建筑年份'] || '-' }}</text>
           </view>
           <view class="info-cell">
-            <text class="cell-label">租赁情况</text>
-            <text class="cell-value">{{ house['租赁情况'] || '-' }}</text>
+            <text class="cell-label">朝向</text>
+            <text class="cell-value">{{ house['朝向'] || '-' }}</text>
           </view>
           <view class="info-cell">
-            <text class="cell-label">法院</text>
-            <text class="cell-value">{{ house.court_name || '-' }}</text>
+            <text class="cell-label">空间布局</text>
+            <text class="cell-value">{{ house['空间布局'] || '-' }}</text>
+          </view>
+          <view class="info-cell">
+            <text class="cell-label">梯户比</text>
+            <text class="cell-value">{{ house['梯户比'] || '-' }}</text>
+          </view>
+          <view class="info-cell full-width">
+            <text class="cell-label">房地产性质</text>
+            <text class="cell-value">{{ house['房地产性质'] || '-' }}</text>
+          </view>
+          <view class="info-cell full-width">
+            <text class="cell-label">房产截至日期</text>
+            <text class="cell-value">{{ house['房产截至日期'] || '-' }}</text>
           </view>
         </view>
       </view>
@@ -206,23 +213,38 @@ onShareAppMessage(() => {
             <text class="row-value">{{ house.auction_round || '-' }}</text>
           </view>
           <view class="info-row">
+            <text class="row-label">法院</text>
+            <text class="row-value">{{ house.court_name || '-' }}</text>
+          </view>
+          <view class="info-row">
+            <text class="row-label">法院裁定书</text>
+            <text class="row-value">{{ house['法院裁定书'] || '-' }}</text>
+          </view>
+          <view class="info-row">
             <text class="row-label">腾空状态</text>
             <text class="row-value" :class="house['是否已腾空'] === '是' ? 'text-success' : 'text-danger'">
               {{ house['是否已腾空'] || '-' }}
             </text>
           </view>
+          <view class="info-row">
+            <text class="row-label">租赁情况</text>
+            <text class="row-value">{{ house['租赁情况'] || '-' }}</text>
+          </view>
+          <view class="info-row">
+            <text class="row-label">占有情况</text>
+            <text class="row-value">{{ house['占有情况'] || '-' }}</text>
+          </view>
+          <view class="info-row">
+            <text class="row-label">竞买记录</text>
+            <text class="row-value">{{ house['竞买记录'] || '-' }}</text>
+          </view>
         </view>
       </view>
 
-      <!-- 操作按钮 -->
-      <view class="action-bar">
-        <view class="btn btn-large btn-primary" @click="openLink(house.item_link)">
-          <text>&#128722;</text>
-          <text>查看淘宝拍卖</text>
-        </view>
-        <view v-if="house.detail_url" class="btn btn-large btn-info" @click="openLink(house.detail_url)">
-          <text>查看司法拍卖详情</text>
-        </view>
+      <!-- 特别提醒 -->
+      <view class="section-card" v-if="!isEmpty(house['特别提醒'])">
+        <view class="section-title">特别提醒</view>
+        <view class="notice-text">{{ house['特别提醒'] }}</view>
       </view>
 
       <view class="safe-bottom" />
@@ -321,6 +343,7 @@ onShareAppMessage(() => {
 .header-tags {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* 信息区块 */
@@ -400,6 +423,10 @@ onShareAppMessage(() => {
   gap: 4px;
 }
 
+.info-cell.full-width {
+  width: 100%;
+}
+
 .cell-label {
   font-size: 12px;
   color: #999;
@@ -438,6 +465,10 @@ onShareAppMessage(() => {
   font-size: 14px;
   color: #333;
   font-weight: 500;
+  flex: 1;
+  text-align: right;
+  margin-left: 12px;
+  word-break: break-all;
 }
 
 .text-success {
@@ -446,6 +477,15 @@ onShareAppMessage(() => {
 
 .text-danger {
   color: #f56c6c;
+}
+
+/* 特别提醒 */
+.notice-text {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* 标签 */
@@ -470,6 +510,11 @@ onShareAppMessage(() => {
 .tag-warning {
   background: #fff3e0;
   color: #ef6c00;
+}
+
+.tag-info {
+  background: #f5f5f5;
+  color: #666;
 }
 
 /* 操作栏 */

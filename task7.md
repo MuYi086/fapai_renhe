@@ -1,0 +1,1 @@
+有问题，h5正常渲染，能获取到/static/community.json和/static/house.json，但是编译微信小程序，首页显示空白，network也没有获取到json，渲染出错，帮我分析并修复

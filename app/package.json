@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "dev:h5": "npx uni --host 0.0.0.0 -p h5",
-    "dev:mp-weixin": "npx uni build -p mp-weixin",
+    "build:h5": "npx uni build -p h5",
+    "dev:mp-weixin": "npx uni -p mp-weixin",
     "build:mp-weixin": "npx uni build -p mp-weixin",
-    "dev:mp-alipay": "npx uni build -p mp-alipay",
+    "dev:mp-alipay": "npx uni -p mp-alipay",
     "build:mp-alipay": "npx uni build -p mp-alipay"
   },
   "dependencies": {

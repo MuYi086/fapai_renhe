@@ -90,7 +90,7 @@ function formatPrice(price) {
     <header class="page-header">
       <div class="header-inner">
         <el-icon size="28" color="#fff"><OfficeBuilding /></el-icon>
-        <h1>仁和社区法拍房信息平台</h1>
+        <h1>仁和街道法拍房信息平台</h1>
       </div>
     </header>
 
@@ -238,7 +238,7 @@ function formatPrice(price) {
     </main>
 
     <footer class="page-footer">
-      <p>仁和社区法拍房信息查询系统</p>
+      <p>仁和街道法拍房信息查询系统</p>
     </footer>
   </div>
 </template>
